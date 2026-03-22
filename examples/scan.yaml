@@ -1,0 +1,5 @@
+input: ./malicious-skill
+output: ../out/from-config-report.json
+threshold: high
+locale: zh-CN
+enable_llm_scan: true

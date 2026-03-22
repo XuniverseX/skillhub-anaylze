@@ -1,0 +1,8 @@
+{
+  "risk": false,
+  "threshold": "HIGH",
+  "risk_score": 0,
+  "risk_label": "clean",
+  "max_severity": "",
+  "findings": null
+}
