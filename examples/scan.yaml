@@ -3,3 +3,7 @@ output: ../out/from-config-report.json
 threshold: high
 locale: zh-CN
 enable_llm_scan: true
+llm_provider: openai
+openai_model: gpt-4.1-mini
+openai_api_key_env: OPENAI_API_KEY
+# openai_base_url: https://api.openai.com

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -13,12 +14,16 @@ import (
 )
 
 type Config struct {
-	Input         string `yaml:"input" json:"input"`
-	Output        string `yaml:"output" json:"output"`
-	Threshold     string `yaml:"threshold" json:"threshold"`
-	RulesFile     string `yaml:"rules_file" json:"rules_file"`
-	Locale        string `yaml:"locale" json:"locale"`
-	EnableLLMScan bool   `yaml:"enable_llm_scan" json:"enable_llm_scan"`
+	Input           string `yaml:"input" json:"input"`
+	Output          string `yaml:"output" json:"output"`
+	Threshold       string `yaml:"threshold" json:"threshold"`
+	RulesFile       string `yaml:"rules_file" json:"rules_file"`
+	Locale          string `yaml:"locale" json:"locale"`
+	EnableLLMScan   bool   `yaml:"enable_llm_scan" json:"enable_llm_scan"`
+	LLMProvider     string `yaml:"llm_provider" json:"llm_provider"`
+	OpenAIModel     string `yaml:"openai_model" json:"openai_model"`
+	OpenAIAPIKeyEnv string `yaml:"openai_api_key_env" json:"openai_api_key_env"`
+	OpenAIBaseURL   string `yaml:"openai_base_url" json:"openai_base_url"`
 }
 
 type Result struct {
@@ -69,7 +74,17 @@ func ScanConfigFile(path string) (*Result, error) {
 		RuleScan: ruleScan,
 	}
 	if cfg.EnableLLMScan {
-		llmResult, err := llmscan.ScanDir(cfg.Input, llmscan.Options{Locale: cfg.Locale})
+		apiKey, err := lookupOpenAIAPIKey(cfg.OpenAIAPIKeyEnv)
+		if err != nil {
+			return nil, err
+		}
+		llmResult, err := llmscan.ScanDir(cfg.Input, llmscan.Options{
+			Locale:   cfg.Locale,
+			Provider: cfg.LLMProvider,
+			Model:    cfg.OpenAIModel,
+			APIKey:   apiKey,
+			BaseURL:  cfg.OpenAIBaseURL,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -97,4 +112,16 @@ func resolveConfigPath(baseDir, value string) string {
 		return value
 	}
 	return filepath.Join(baseDir, value)
+}
+
+func lookupOpenAIAPIKey(envName string) (string, error) {
+	name := envName
+	if strings.TrimSpace(name) == "" {
+		name = "OPENAI_API_KEY"
+	}
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return "", fmt.Errorf("openai api key env %q is not set", name)
+	}
+	return value, nil
 }

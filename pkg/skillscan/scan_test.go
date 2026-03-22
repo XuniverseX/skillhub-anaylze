@@ -99,14 +99,23 @@ func TestScanDirChineseLocale(t *testing.T) {
 		t.Fatalf("ScanDir returned error: %v", err)
 	}
 
-	if result.RiskLabel != "严重" {
-		t.Fatalf("expected localized risk label, got %q", result.RiskLabel)
+	if result.RiskLabel != "critical" {
+		t.Fatalf("expected risk label to stay English, got %q", result.RiskLabel)
 	}
-	if result.MaxSeverity != "严重" {
-		t.Fatalf("expected localized max severity, got %q", result.MaxSeverity)
+	if result.MaxSeverity != SeverityCritical {
+		t.Fatalf("expected max severity to stay English, got %q", result.MaxSeverity)
+	}
+	if result.Threshold != "HIGH" {
+		t.Fatalf("expected threshold to stay English, got %q", result.Threshold)
 	}
 	if len(result.Findings) == 0 {
 		t.Fatal("expected findings")
+	}
+	if result.Findings[0].Severity != SeverityCritical {
+		t.Fatalf("expected finding severity to stay English, got %q", result.Findings[0].Severity)
+	}
+	if result.Findings[0].Pattern != "prompt-injection" {
+		t.Fatalf("expected finding pattern to stay English, got %q", result.Findings[0].Pattern)
 	}
 	if result.Findings[0].Message == "Prompt injection attempt detected" {
 		t.Fatal("expected finding message to be localized")
