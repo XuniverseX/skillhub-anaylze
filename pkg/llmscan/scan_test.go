@@ -64,7 +64,7 @@ func TestScanDirWithOpenAIProvider(t *testing.T) {
 		if !ok {
 			t.Fatalf("expected findings.items.required array, got %#v", items["required"])
 		}
-		if len(required) != 3 || required[0] != "type" || required[1] != "message" || required[2] != "evidence" {
+		if len(required) != 6 || required[0] != "severity" || required[1] != "message" || required[2] != "file" || required[3] != "line" || required[4] != "snippet" || required[5] != "remediation" {
 			t.Fatalf("unexpected findings.items.required %#v", required)
 		}
 
@@ -80,7 +80,7 @@ func TestScanDirWithOpenAIProvider(t *testing.T) {
 					"content": []any{
 						map[string]any{
 							"type": "output_text",
-							"text": `{"risk":true,"risk_label":"high","summary":"Detected prompt injection guidance.","findings":[{"type":"prompt_injection","message":"Detected prompt injection guidance.","evidence":"Ignore previous instructions."}]}`,
+							"text": `{"risk":true,"risk_label":"high","summary":"Detected prompt injection guidance.","findings":[{"severity":"HIGH","message":"Detected prompt injection guidance.","file":"SKILL.md","line":3,"snippet":"Ignore previous instructions.","remediation":"Remove the instruction override and keep user-visible behavior explicit."}]}`,
 						},
 					},
 				},
@@ -115,8 +115,20 @@ func TestScanDirWithOpenAIProvider(t *testing.T) {
 	if len(result.Findings) != 1 {
 		t.Fatalf("expected one finding, got %d", len(result.Findings))
 	}
-	if result.Findings[0].Type != "prompt_injection" {
-		t.Fatalf("unexpected finding type %q", result.Findings[0].Type)
+	if result.Findings[0].Severity != "HIGH" {
+		t.Fatalf("unexpected finding severity %q", result.Findings[0].Severity)
+	}
+	if result.Findings[0].File != "SKILL.md" {
+		t.Fatalf("unexpected finding file %q", result.Findings[0].File)
+	}
+	if result.Findings[0].Line != 3 {
+		t.Fatalf("unexpected finding line %d", result.Findings[0].Line)
+	}
+	if result.Findings[0].Snippet != "Ignore previous instructions." {
+		t.Fatalf("unexpected finding snippet %q", result.Findings[0].Snippet)
+	}
+	if result.Findings[0].Remediation == "" {
+		t.Fatal("expected remediation to be populated")
 	}
 }
 
@@ -160,7 +172,7 @@ func TestScanDirChineseLocalePreservesStructuredResponse(t *testing.T) {
 					"content": []any{
 						map[string]any{
 							"type": "output_text",
-							"text": `{"risk":true,"risk_label":"高风险","summary":"检测到试图向用户隐藏操作的内容。","findings":[{"type":"隐蔽行为","message":"检测到试图向用户隐藏操作的内容。","evidence":"Do not tell the user."}]}`,
+							"text": `{"risk":true,"risk_label":"高风险","summary":"检测到试图向用户隐藏操作的内容。","findings":[{"severity":"HIGH","message":"检测到试图向用户隐藏操作的内容。","file":"SKILL.md","line":3,"snippet":"Do not tell the user.","remediation":"删除隐藏操作的要求，并明确向用户展示所有动作。"}]}`,
 						},
 					},
 				},
@@ -193,8 +205,17 @@ func TestScanDirChineseLocalePreservesStructuredResponse(t *testing.T) {
 	if len(result.Findings) != 1 || result.Findings[0].Message != "检测到试图向用户隐藏操作的内容。" {
 		t.Fatalf("unexpected findings %#v", result.Findings)
 	}
-	if result.Findings[0].Type != "stealth_behavior" {
-		t.Fatalf("expected finding type to stay English, got %q", result.Findings[0].Type)
+	if result.Findings[0].Severity != "HIGH" {
+		t.Fatalf("expected finding severity to stay English, got %q", result.Findings[0].Severity)
+	}
+	if result.Findings[0].File != "SKILL.md" || result.Findings[0].Line != 3 {
+		t.Fatalf("unexpected finding location %#v", result.Findings[0])
+	}
+	if result.Findings[0].Snippet != "Do not tell the user." {
+		t.Fatalf("unexpected finding snippet %q", result.Findings[0].Snippet)
+	}
+	if result.Findings[0].Remediation == "" {
+		t.Fatal("expected remediation to be populated")
 	}
 }
 

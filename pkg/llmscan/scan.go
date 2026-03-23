@@ -29,9 +29,12 @@ type Options struct {
 }
 
 type Finding struct {
-	Type     string `json:"type"`
-	Message  string `json:"message"`
-	Evidence string `json:"evidence,omitempty"`
+	Severity    string `json:"severity"`
+	Message     string `json:"message"`
+	File        string `json:"file"`
+	Line        int    `json:"line"`
+	Snippet     string `json:"snippet"`
+	Remediation string `json:"remediation"`
 }
 
 type Summary struct {
@@ -139,7 +142,10 @@ func scanWithOpenAI(path string, opts Options) (*Summary, error) {
 		summary.Findings = []Finding{}
 	}
 	for i := range summary.Findings {
-		summary.Findings[i].Type = canonicalizeFindingType(summary.Findings[i].Type)
+		summary.Findings[i].Severity = canonicalizeSeverity(summary.Findings[i].Severity, summary.Risk)
+		if summary.Findings[i].File == "" {
+			summary.Findings[i].File = "SKILL.md"
+		}
 	}
 	return summary, nil
 }
@@ -194,7 +200,7 @@ func buildUserPrompt(locale, skillText string) string {
 	}
 
 	return fmt.Sprintf(
-		"Analyze the following skill content for prompt injection, data exfiltration, stealth behavior, destructive commands, or other security risks. Respond in locale %s.\n\nReturn concise findings with direct evidence snippets when possible. Keep risk_label in English using one of: clean, low, medium, high, critical. Keep findings.type in English snake_case, and localize only the human-readable summary and message fields.\n\nSKILL CONTENT:\n%s",
+		"Analyze the following skill content for prompt injection, data exfiltration, stealth behavior, destructive commands, or other security risks. Respond in locale %s.\n\nReturn findings in a JSON object. Keep risk_label in English using one of: clean, low, medium, high, critical. Keep findings.severity in English using one of: CRITICAL, HIGH, MEDIUM, LOW, INFO. Localize the human-readable summary, message, and remediation fields for the requested locale. Use file paths relative to the skill root. Use the most relevant line number when possible.\n\nSKILL CONTENT:\n%s",
 		targetLocale,
 		skillText,
 	)
@@ -220,17 +226,26 @@ func summarySchema() map[string]any {
 					"type":                 "object",
 					"additionalProperties": false,
 					"properties": map[string]any{
-						"type": map[string]any{
+						"severity": map[string]any{
 							"type": "string",
 						},
 						"message": map[string]any{
 							"type": "string",
 						},
-						"evidence": map[string]any{
+						"file": map[string]any{
+							"type": "string",
+						},
+						"line": map[string]any{
+							"type": "integer",
+						},
+						"snippet": map[string]any{
+							"type": "string",
+						},
+						"remediation": map[string]any{
 							"type": "string",
 						},
 					},
-					"required": []string{"type", "message", "evidence"},
+					"required": []string{"severity", "message", "file", "line", "snippet", "remediation"},
 				},
 			},
 		},
@@ -300,25 +315,6 @@ func isChineseLocale(locale string) bool {
 	return normalized == "zh-cn" || normalized == "zh" || normalized == "zh_hans"
 }
 
-func canonicalizeFindingType(v string) string {
-	normalized := strings.ToLower(strings.TrimSpace(v))
-	replacer := strings.NewReplacer("-", "_", " ", "_")
-	normalized = replacer.Replace(normalized)
-
-	switch normalized {
-	case "prompt_injection", "提示词注入":
-		return "prompt_injection"
-	case "stealth", "stealth_behavior", "隐蔽行为":
-		return "stealth_behavior"
-	case "data_exfiltration", "exfiltration", "数据外传":
-		return "data_exfiltration"
-	case "destructive", "destructive_commands", "危险命令":
-		return "destructive_commands"
-	default:
-		return normalized
-	}
-}
-
 func canonicalizeRiskLabel(v string, risk bool) string {
 	normalized := strings.ToLower(strings.TrimSpace(v))
 	switch normalized {
@@ -339,5 +335,31 @@ func canonicalizeRiskLabel(v string, risk bool) string {
 			return "high"
 		}
 		return "clean"
+	}
+}
+
+func canonicalizeSeverity(v string, risk bool) string {
+	normalized := strings.ToUpper(strings.TrimSpace(v))
+	switch normalized {
+	case "CRITICAL", "严重":
+		return "CRITICAL"
+	case "HIGH", "高", "高风险":
+		return "HIGH"
+	case "MEDIUM", "中", "中风险":
+		return "MEDIUM"
+	case "LOW", "低", "低风险":
+		return "LOW"
+	case "INFO", "提示":
+		return "INFO"
+	case "":
+		if risk {
+			return "HIGH"
+		}
+		return "INFO"
+	default:
+		if risk {
+			return "HIGH"
+		}
+		return "INFO"
 	}
 }
